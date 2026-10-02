@@ -1,0 +1,14 @@
+.venv/
+.idea/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# runtime output
+fatigue_log.txt
+fatigue_metrics_log.csv
+fatigue_system.log
+fatigue_charts/
+*.h5
