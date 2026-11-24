@@ -7,8 +7,12 @@ __pycache__/
 htmlcov/
 
 # runtime output
+output/
 fatigue_log.txt
 fatigue_metrics_log.csv
 fatigue_system.log
 fatigue_charts/
 *.h5
+
+# macOS metadata
+.DS_Store

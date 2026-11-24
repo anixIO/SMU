@@ -1,0 +1,68 @@
+:root {
+  color: #242424;
+  background: #fff;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+main { max-width: 1080px; margin: 0 auto; padding: 36px 28px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.4px; }
+h2 { margin: 0; font-size: 17px; font-weight: 600; }
+p { margin: 8px 0 0; }
+.muted, .technical, dt { color: #6b6b6b; }
+header .muted, .technical { font-size: 12px; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(260px, 1fr); gap: 32px; }
+
+.camera { position: relative; aspect-ratio: 4 / 3; background: #f1f1f1; border-radius: 6px; overflow: hidden; }
+video { display: block; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
+.placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: #777; }
+.camera-label { position: absolute; left: 12px; bottom: 12px; padding: 3px 8px; color: white; background: #222b; border-radius: 3px; font-size: 12px; }
+.controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.technical { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+button, .button { display: inline-flex; align-items: center; justify-content: center; padding: 9px 13px; border: 1px solid #242424; border-radius: 5px; background: #242424; color: white; font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
+button:hover { background: #444; }
+button:disabled { opacity: .5; cursor: wait; }
+button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #3674b5; outline-offset: 4px; }
+.secondary { background: white; color: #333; border-color: #ddd; }
+.secondary:hover { background: #f6f6f6; }
+[aria-disabled="true"] { opacity: .4; pointer-events: none; }
+.text-button { border: 0; padding: 0; background: none; color: #666; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.text-button:hover { background: none; color: #222; }
+
+#status { min-height: 114px; border-left: 2px solid #ddd; padding-left: 14px; }
+#status p { color: #6b6b6b; font-size: 13px; }
+#status[data-state="ok"] { border-color: #42835a; }
+#status[data-state="warn"] { border-color: #b63b30; }
+#status[data-state="warn"] h2 { color: #a73329; }
+.metrics { margin: 16px 0 24px; }
+.metrics > div { display: flex; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid #eee; }
+dt small { font-size: 10px; color: #888; margin-left: 4px; }
+dd { margin: 0; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.voice-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; }
+.voice-controls label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+input { margin: 0; accent-color: #333; }
+#voice-hint { flex-basis: 100%; margin: 0; font-size: 12px; }
+#voice-hint:empty { display: none; }
+
+details { margin-top: 32px; border-top: 1px solid #e5e5e5; padding-top: 16px; }
+summary { cursor: pointer; font-size: 13px; }
+.chart { margin-top: 24px; position: relative; }
+.chart-heading { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; }
+.chart svg { display: block; width: 100%; height: 150px; }
+#chart-empty { text-align: center; font-size: 12px; }
+#events { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; font-size: 12px; }
+#events li { display: flex; gap: 16px; padding: 8px 0; }
+#events time { color: #777; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 760px) {
+  main { padding: 24px 18px; }
+  header { align-items: flex-start; flex-direction: column; gap: 4px; margin-bottom: 20px; }
+  .workspace { grid-template-columns: 1fr; gap: 26px; }
+  #status { min-height: 0; }
+  .technical { flex-basis: 100%; margin-left: 0; }
+}
