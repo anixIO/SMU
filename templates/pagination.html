@@ -1,0 +1,7 @@
+{% if pagination.has_other_pages %}
+  <nav class="pagination" aria-label="Страницы списка">
+    {% if pagination.has_previous %}<a class="table-link" href="?{{ param }}={{ pagination.previous_page_number }}#{{ anchor }}">Назад</a>{% endif %}
+    <span>Страница {{ pagination.number }} из {{ pagination.paginator.num_pages }}</span>
+    {% if pagination.has_next %}<a class="table-link" href="?{{ param }}={{ pagination.next_page_number }}#{{ anchor }}">Далее</a>{% endif %}
+  </nav>
+{% endif %}

@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 from src.app import App, Config
-from src.detector import FatigueDetector
+from src.detector import FatigueDetector, FatigueRules
 from src.interface import FontManager, HUDRenderer
 from src.metrics import FrameMetrics, MetricsCalculator, TemporalMetrics
 from src.reporting import AlertSystem, VideoLogger, plot_metrics
@@ -118,15 +118,30 @@ class ComponentTests(unittest.TestCase):
                     MetricsCalculator.estimate_head_pose(points, 640, 480), angles, atol=.1,
                 )
 
-    def test_head_tilt_alerts_in_both_directions(self):
-        detector = FatigueDetector.__new__(FatigueDetector)
-        detector.cfg = Config(str(Path(tempfile.gettempdir()) / 'smu-no-config.yaml'))
-        detector.temporal = TemporalMetrics(5, 5)
+    def test_head_tilt_is_a_sustained_attention_signal(self):
         for pitch, direction in [(40, 'вперёд'), (-40, 'назад')]:
-            reasons = detector.evaluate(FrameMetrics(detected=True, pitch=pitch))
-            self.assertTrue(any(f'наклон головы {direction}' in reason for reason in reasons))
-        for pitch in (0, 10, -10):
-            self.assertEqual(detector.evaluate(FrameMetrics(detected=True, pitch=pitch)), [])
+            rules = FatigueRules(Config(overrides={'CALIBRATION_SECONDS': 0}))
+            first = rules.update(FrameMetrics(detected=True, ear=.3, pitch=pitch, yaw=0), 0)
+            self.assertEqual(first.reasons, [])
+            sustained = rules.update(FrameMetrics(detected=True, ear=.3, pitch=pitch, yaw=0), .8)
+            self.assertEqual(sustained.status, 'attention')
+            self.assertTrue(any(direction in reason for reason in sustained.reasons))
+            self.assertFalse(sustained.fatigue)
+
+    def test_calibration_keeps_naturally_narrow_eyes_from_triggering_warning(self):
+        rules = FatigueRules(Config(overrides={'CALIBRATION_SECONDS': 1}))
+        for i in range(13):
+            result = rules.update(FrameMetrics(detected=True, ear=.18, mar=.1, pitch=12, yaw=6, roll=0), i / 10)
+        self.assertLess(rules.ear_threshold, .18)
+        self.assertEqual(result.pitch, 0)
+        self.assertEqual(result.status, 'tracking')
+        for i in range(13, 19):
+            result = rules.update(FrameMetrics(detected=True, ear=.07, mar=.1, pitch=12, yaw=6, roll=0), i / 10)
+        self.assertEqual(result.status, 'fatigue')
+        self.assertTrue(result.fatigue)
+
+    def test_missing_pose_is_unknown(self):
+        self.assertIsNone(MetricsCalculator.estimate_head_pose([(0, 0)] * 468, 640, 480))
 
     def test_head_pose_remains_upright_with_noisy_landmarks(self):
         camera = np.array([[640., 0, 320], [0, 640, 240], [0, 0, 1]])
@@ -206,18 +221,16 @@ class ComponentTests(unittest.TestCase):
             plot.assert_called_once()
 
     def test_detector_resets_when_face_disappears(self):
-        with tempfile.TemporaryDirectory() as directory:
-            config = Config(str(Path(directory) / 'missing.yaml'))
         with patch('src.detector.mp.solutions.face_mesh.FaceMesh') as mesh:
             mesh.return_value.process.return_value.multi_face_landmarks = None
-            detector = FatigueDetector(config)
+            detector = FatigueDetector(Config(overrides={'CALIBRATION_SECONDS': 0}))
             try:
-                detector.temporal.update(0, True, True)
-                detector.temporal.update(0.5, True, True)
+                detector.rules.temporal.update(0, True, True)
+                detector.rules.temporal.update(0.5, True, True)
                 result = detector.process(np.zeros((80, 120, 3), dtype=np.uint8))
                 self.assertFalse(result.detected)
-                self.assertEqual(detector.temporal.eye_seconds, 0)
-                self.assertFalse(detector.temporal.ready)
+                self.assertEqual(detector.rules.temporal.eye_seconds, 0)
+                self.assertFalse(detector.rules.temporal.ready)
             finally:
                 detector.close()
 

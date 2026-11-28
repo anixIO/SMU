@@ -29,7 +29,7 @@ class FrameMetrics:
     #     pitch: наклон головы вперёд/назад, градусы.
     #     yaw: поворот головы влево/вправо, градусы.
     #     roll: крен головы, градусы.
-    #     fatigue: сработал ли хотя бы один признак усталости.
+    #     fatigue: длительное закрытие глаз или высокий PERCLOS.
     #     reasons: текстовые причины срабатывания.
     #     landmarks: сырые landmarks MediaPipe (для отрисовки сетки).
 
@@ -38,9 +38,11 @@ class FrameMetrics:
     mar: float = 0.0
     perclos: float = 0.0
     perclos_ready: bool = False
-    pitch: float = 0.0
-    yaw: float = 0.0
-    roll: float = 0.0
+    pitch: float | None = None
+    yaw: float | None = None
+    roll: float | None = None
+    status: str = "tracking"
+    calibration: float | None = None
     fatigue: bool = False
     reasons: list[str] = field(default_factory=list)
     landmarks: Any = None
@@ -153,8 +155,8 @@ class MetricsCalculator:
         return self.mouth_aspect_ratio([pts[i] for i in self.MOUTH_IDX])
 
     @staticmethod
-    def estimate_head_pose(pts: Sequence[Point], w: int, h: int) -> tuple[float, float, float]:
-        """Возвращает (pitch, yaw, roll) в градусах; pitch > 0 при наклоне вперёд."""
+    def estimate_head_pose(pts: Sequence[Point], w: int, h: int) -> tuple[float, float, float] | None:
+        """Возвращает углы в градусах или None, если позу нельзя оценить."""
         pts_2d = np.array(
             [(pts[i][0], pts[i][1]) for i in MetricsCalculator.HEAD_POSE_IDX],
             dtype=np.float64,
@@ -171,7 +173,7 @@ class MetricsCalculator:
         try:
             eye_distance = np.linalg.norm(pts_2d[2] - pts_2d[3])
             if eye_distance < 1:
-                return 0.0, 0.0, 0.0
+                return None
             depth = focal * np.linalg.norm(
                 MetricsCalculator.HEAD_MODEL[2] - MetricsCalculator.HEAD_MODEL[3]
             ) / eye_distance
@@ -190,10 +192,15 @@ class MetricsCalculator:
                 flags=cv2.SOLVEPNP_ITERATIVE,
             )
             if not success or translation[2, 0] <= 0:
-                return 0.0, 0.0, 0.0
+                return None
+            projected, _ = cv2.projectPoints(MetricsCalculator.HEAD_MODEL, rvec, translation,
+                                             camera_matrix, dist_coeffs)
+            error = np.linalg.norm(projected[:, 0] - pts_2d, axis=1).mean()
+            if not np.isfinite(error) or error > eye_distance * 0.12:
+                return None
             rmat, _ = cv2.Rodrigues(rvec)
             angles = cv2.RQDecomp3x3(rmat)[0]
             return tuple(float(angle) for angle in angles)
         except cv2.error as e:
             logger.debug(f"solvepnp не сошёлся: {e}")
-            return 0.0, 0.0, 0.0
+            return None

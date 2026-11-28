@@ -82,7 +82,7 @@ class VideoLogger:
     # Пишет метрики каждого кадра в CSV-файл (перезаписывает при старте).
 
     HEADER: list[str] = ["Frame", "Timestamp", "EAR", "MAR", "PERCLOS",
-                         "Pitch", "Yaw", "Roll", "Fatigue"]
+                         "Pitch", "Yaw", "Roll", "Fatigue", "FaceVisible", "State"]
 
     def __init__(self, filename: str = "output/fatigue_metrics_log.csv") -> None:
         self.filename = filename
@@ -113,8 +113,8 @@ class VideoLogger:
                 round(time.monotonic() - self.start_time, 2),
                 round(m.ear, 4), round(m.mar, 4),
                 round(m.perclos, 4),
-                round(m.pitch, 2), round(m.yaw, 2), round(m.roll, 2),
-                int(m.fatigue),
+                *(round(angle, 2) if angle is not None else None for angle in (m.pitch, m.yaw, m.roll)),
+                int(m.fatigue), int(m.detected), m.status,
             ])
             self.file.flush()
         except Exception as e:

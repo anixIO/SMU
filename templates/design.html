@@ -1,70 +1,88 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Контроль усталости</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="{% url 'asset' path='monitor.css' %}">
-  <script src="{% url 'asset' path='monitor.js' %}" defer></script>
-</head>
-<body>
-  <main id="monitor" data-start-url="{% url 'start' %}" data-frame-url="{% url 'frame' %}" data-stop-url="{% url 'stop' %}">
-    <header>
-      <h1>Контроль усталости</h1>
-      <span class="muted">Кадры не сохраняются</span>
-    </header>
+{% extends "base.html" %}
+{% block monitor_current %}aria-current="page"{% endblock %}
+{% block scripts %}<script src="{% url 'asset' path='monitor.js' %}?v=3" defer></script>{% endblock %}
+{% block content %}
+<main class="container main" id="content">
+  <div id="monitor" data-start-url="{% url 'start' %}" data-frame-url="{% url 'frame' %}" data-stop-url="{% url 'stop' %}">
+    <div class="page-heading">
+      <h1>Наблюдение</h1>
+      <p>Смотрите в камеру, чтобы отслеживать признаки сонливости.</p>
+    </div>
 
-    <div class="workspace">
-      <section aria-label="Камера">
+    {% if config_error %}
+      <p class="form-alert" role="alert">Проверьте настройки детектора. {{ config_error }}</p>
+    {% endif %}
+    <noscript><p class="form-alert">Для доступа к камере включите JavaScript и обновите страницу.</p></noscript>
+
+    <div class="monitor-grid">
+      <section class="panel capture-panel" aria-labelledby="camera-title">
+        <div class="panel-head">
+          <h2 id="camera-title">Камера</h2>
+          <span class="tag" id="camera-label"><span class="status-dot" aria-hidden="true"></span><span id="camera-text">Выключена</span></span>
+        </div>
         <div class="camera">
           <video id="video" autoplay muted playsinline aria-label="Изображение с камеры"></video>
-          <div class="placeholder" id="camera-empty">Камера выключена</div>
-          <span class="camera-label" id="camera-label" hidden>Ожидание лица</span>
+          <div class="camera-idle" id="camera-empty">
+            <div class="viewfinder" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i></div>
+            <strong>Камера выключена</strong>
+            <span>Она включится после начала наблюдения.</span>
+          </div>
+          <div class="live-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
         </div>
-        <div class="controls">
-          <button id="toggle" type="button">Начать наблюдение</button>
-          <a id="report" class="button secondary" href="{% url 'report' %}" aria-disabled="{% if has_report %}false{% else %}true{% endif %}" {% if not has_report %}tabindex="-1"{% endif %}>Скачать CSV</a>
-          <span class="technical"><span id="frames">0</span> кадров · <span id="fps">0.0</span> FPS</span>
+        <div class="camera-actions">
+          <button class="button button-primary" id="toggle" type="button" {% if config_error %}disabled{% endif %}>Начать наблюдение</button>
+          <a id="report" class="button button-secondary" href="{% url 'report' %}" aria-disabled="{% if has_report %}false{% else %}true{% endif %}" {% if not has_report %}tabindex="-1"{% endif %}>Скачать CSV</a>
+        </div>
+        <div class="camera-foot">
+          <span>Кадры не сохраняются</span>
+          <span class="numeric"><span id="frames">0</span> кадров <span aria-hidden="true">·</span> <span id="fps">0,0</span> кадр/с</span>
         </div>
       </section>
 
-      <aside aria-label="Состояние и показатели">
-        <section id="status" data-state="idle" role="status" aria-live="polite" aria-atomic="true">
-          <h2 id="status-title">Готово к наблюдению</h2>
-          <p id="status-description">Сядьте перед камерой и нажмите «Начать наблюдение».</p>
-        </section>
-        <dl class="metrics">
-          {% for card in cards %}
-          <div title="{{ card.hint }}"><dt>{{ card.title }} <small>{{ card.unit }}</small></dt><dd id="{{ card.id }}">—</dd></div>
-          {% endfor %}
-          <div title="{{ pitch_hint }}"><dt>Наклон головы</dt><dd id="pitch">—</dd></div>
-          <div><dt>Поворот</dt><dd id="yaw">—</dd></div>
-          <div><dt>Крен</dt><dd id="roll">—</dd></div>
-        </dl>
-        <div class="voice-controls">
-          <label><input id="sound" type="checkbox" checked>Голосовые оповещения</label>
-          <button id="test-voice" class="text-button" type="button">Проверить голос</button>
-          <p id="voice-hint" class="muted" role="status" aria-live="polite"></p>
+      <section class="panel signals-panel" aria-labelledby="signals-title">
+        <div class="panel-head"><h2 id="signals-title">Показатели</h2></div>
+        <div class="state" id="status" data-state="idle">
+          <span class="state-mark" aria-hidden="true"><i></i></span>
+          <div class="state-copy" role="status" aria-live="polite">
+            <h3 id="status-title">Готово к наблюдению</h3>
+            <p id="status-description">{% if calibration_enabled %}После запуска смотрите прямо, пока идёт калибровка.{% else %}Во время наблюдения держите лицо в кадре.{% endif %}</p>
+          </div>
+          <progress id="calibration" aria-label="Калибровка" max="1" value="0" hidden></progress>
         </div>
-      </aside>
+        <dl class="metrics">
+          <div><dt>Глаза <small>EAR</small></dt><dd id="ear">—</dd></div>
+          <div><dt>Рот <small>MAR</small></dt><dd id="mar">—</dd></div>
+          <div><dt>Время с закрытыми глазами <small>PERCLOS</small></dt><dd id="perclos">—</dd></div>
+          <div><dt>Наклон · поворот · крен</dt><dd class="angles"><span id="pitch">—</span><span id="yaw">—</span><span id="roll">—</span></dd></div>
+        </dl>
+        <div class="voice-row">
+          <label class="voice-toggle"><input id="sound" type="checkbox" role="switch" checked><span class="switch" aria-hidden="true"></span>Голосовые оповещения</label>
+          <button id="test-voice" class="text-button" type="button">Проверить</button>
+          <p id="voice-hint" class="small muted" role="status"></p>
+        </div>
+      </section>
     </div>
 
-    <details id="history">
-      <summary>История сеанса <span class="muted" id="event-count">· 0</span></summary>
-      <div class="chart">
-        <div class="chart-heading">PERCLOS <span class="muted">последние 30 с</span></div>
-        <svg viewBox="0 0 1000 150" preserveAspectRatio="none" role="img" aria-label="PERCLOS за последние 30 секунд, от 0 до 100 процентов">
-          <g stroke="#e8e8e8"><path d="M35 12H990M35 65H990M35 118H990"/></g>
-          <g fill="#777" font-size="10" font-family="sans-serif"><text x="0" y="16">100%</text><text x="6" y="69">50%</text><text x="12" y="122">0%</text><text x="35" y="143">−30 с</text><text x="940" y="143">Сейчас</text></g>
-          <path id="chart-line" d="" fill="none" stroke="#333" stroke-width="2" vector-effect="non-scaling-stroke"/>
-        </svg>
-        <p id="chart-empty" class="muted">Ожидание данных PERCLOS.</p>
+    <details id="history" class="panel history">
+      <summary><span>История сеанса <small id="event-count"></small></span><span class="chevron" aria-hidden="true"></span></summary>
+      <div class="history-grid">
+        <div class="chart">
+          <div class="section-label"><h3>PERCLOS</h3><span>Последние 30 с</span></div>
+          <svg viewBox="0 0 1000 150" preserveAspectRatio="none" role="img" aria-label="Доля времени с закрытыми глазами за последние 30 секунд">
+            <g class="chart-grid"><path d="M36 12H986M36 65H986M36 118H986"/></g>
+            <g class="chart-ticks"><text x="0" y="16">100%</text><text x="0" y="69">50%</text><text x="0" y="122">0%</text><text x="36" y="143">−30 с</text><text x="930" y="143">Сейчас</text></g>
+            <path id="chart-line" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <p id="chart-empty" class="small muted">Данные появятся во время наблюдения.</p>
+        </div>
+        <div class="event-list">
+          <div class="section-label"><h3>Предупреждения</h3></div>
+          <ol id="events"><li class="muted">Предупреждений пока нет.</li></ol>
+        </div>
       </div>
-      <ol id="events"><li class="muted">Предупреждений пока нет.</li></ol>
     </details>
     <form hidden id="csrf-form">{% csrf_token %}</form>
     <canvas id="capture" hidden></canvas>
-  </main>
-</body>
-</html>
+  </div>
+</main>
+{% endblock %}

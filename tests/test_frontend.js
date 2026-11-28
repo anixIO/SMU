@@ -40,20 +40,21 @@ const sandbox = {
     SpeechSynthesisUtterance: class { constructor(text) { this.text = text; } },
     AudioContext: class { constructor() { this.state = 'running'; } async resume() {} },
   },
-  console, performance, FormData, Blob, AbortSignal,
+  console, performance, FormData, Blob, AbortController,
   setTimeout: () => 1, clearTimeout() {},
   fetch: async (url, options) => {
     requests.push(url);
     assert.equal(options.headers['X-CSRFToken'], 'csrf');
+    if (url !== '/start') assert.equal(options.headers['X-Observation'], 'test-session');
     if (url === '/frame') {
       if (failFrame) throw new Error('Connection interrupted');
       return { ok: true, json: async () => ({
-        detected: true, ear: .3, mar: .1, perclos: .2, perclos_ready: true,
+        detected: true, status: 'fatigue', seconds: 2, ear: .3, mar: .1, perclos: .2, perclos_ready: true,
         pitch: 40, yaw: 0, roll: 0, fatigue: true, reasons: ['наклон головы вперёд 40°'],
         frames: 1, fps: 10, event: { time: '12:00:00', text: 'наклон головы вперёд 40°' },
       }) };
     }
-    return { ok: true, json: async () => ({ active: url === '/start' }) };
+    return { ok: true, json: async () => ({ active: url === '/start', observation: 'test-session', has_report: true }) };
   },
 };
 vm.createContext(sandbox);
@@ -61,7 +62,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '../static/monitor.js'), 'u
 
 async function check() {
   await element('test-voice').handlers.click();
-  assert.equal(spoken.at(-1).text, 'Обнаружена усталость. Сделайте перерыв.');
+  assert.equal(spoken.at(-1).text, 'Обнаружены признаки сонливости. Сделайте перерыв.');
   assert.equal(spoken.at(-1).voice, russianVoice);
   await element('toggle').handlers.click();
   await new Promise(setImmediate);
@@ -69,7 +70,7 @@ async function check() {
   assert.equal(element('capture').width, 640);
   assert.equal(element('capture').height, 360);
   assert.equal(element('status-title').textContent, 'Сделайте перерыв');
-  assert.equal(spoken.at(-1).text, 'Обнаружена усталость. Сделайте перерыв.');
+  assert.equal(spoken.at(-1).text, 'Обнаружены признаки сонливости. Сделайте перерыв.');
 
   const count = spoken.length;
   element('sound').checked = false;

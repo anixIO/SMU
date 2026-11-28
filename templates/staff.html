@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Администрирование · СМУ{% endblock %}
+{% block staff_current %}aria-current="page"{% endblock %}
+{% block content %}
+<main class="container main" id="content">
+  <div class="page-heading">
+    <h1>Администрирование</h1>
+    <p>Сеансы наблюдения, предупреждения и настройки детектора.</p>
+  </div>
+
+  <section class="admin-overview" aria-label="Сводка за последние семь дней">
+    <div class="panel stat"><span>Сеансов за 7 дней</span><strong>{{ session_count }}</strong></div>
+    <div class="panel stat"><span>Предупреждений за 7 дней</span><strong>{{ warning_count }}</strong></div>
+    <div class="panel stat"><span>Ложных за 7 дней</span><strong>{{ false_count }}</strong></div>
+    <div class="panel stat"><span>Кадров с лицом за 7 дней</span><strong>{% if coverage is not None %}{{ coverage }}<small>%</small>{% else %}—{% endif %}</strong></div>
+  </section>
+
+  <div class="admin-grid">
+    <section class="panel" aria-labelledby="recent-title">
+      <div class="panel-head"><h2 id="recent-title">Сеансы</h2></div>
+      {% if reports %}
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица сеансов">
+          <table>
+            <thead><tr><th scope="col">Начало</th><th scope="col">Время</th><th scope="col">Лицо</th><th scope="col">Тревог</th><th scope="col">Отчёт</th></tr></thead>
+            <tbody>
+              {% for report in reports %}
+              <tr>
+                <td><time datetime="{{ report.started_at|date:'c' }}">{{ report.started_at|date:"d.m · H:i" }}</time></td>
+                <td>{% if report.ended_at %}{{ report.seconds }} с{% else %}<span class="tag tag-live">Активен</span>{% endif %}</td>
+                <td>{% if report.coverage is not None %}{{ report.coverage }}%{% else %}—{% endif %}</td>
+                <td>{{ report.warning_count }}</td>
+                <td>{% if report.ended_at %}<a class="table-link" href="{% url 'staff-report' report.pk %}" aria-label="CSV за {{ report.started_at|date:'d.m H:i' }}">CSV</a>{% else %}—{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% include "pagination.html" with pagination=reports param="page" anchor="recent-title" %}
+      {% else %}
+        <p class="empty">Завершённые и текущие сеансы появятся здесь после запуска наблюдения.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel weekly" aria-labelledby="weekly-title">
+      <div class="panel-head"><h2 id="weekly-title">Предупреждения по дням</h2></div>
+      <ol class="bar-chart">
+        {% for day in days %}
+          <li><span class="bar-value">{{ day.count }}</span>
+            <span class="bar-track" aria-hidden="true"><i style="--height: {{ day.height }}%"></i></span>
+            <time datetime="{{ day.day|date:'Y-m-d' }}">{{ day.day|date:"d.m" }}</time>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+  </div>
+
+  <section class="panel warnings" id="warnings" aria-labelledby="warning-title">
+    <div class="panel-head"><h2 id="warning-title">Журнал предупреждений</h2></div>
+    {% if events %}
+      <ul class="warning-events">
+        {% for event in events %}
+          <li>
+            <div><time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"d.m · H:i:s" }}</time><p>{{ event.reason }}</p></div>
+            <form method="post" action="{% url 'staff-warning' event.pk %}">
+              {% csrf_token %}
+              <button class="button button-secondary" type="submit" name="false_alarm" value="{% if event.false_alarm %}0{% else %}1{% endif %}"
+                {% if event.false_alarm %}title="Снять отметку ложной тревоги"{% endif %}>
+                {% if event.false_alarm %}Ложная · отменить{% else %}Отметить ложной{% endif %}
+              </button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+      {% include "pagination.html" with pagination=events param="events" anchor="warnings" %}
+    {% else %}
+      <p class="empty">Предупреждений пока нет.</p>
+    {% endif %}
+  </section>
+
+  <details class="panel boxed-details" id="settings" {% if open_settings or saved or config_error %}open{% endif %}>
+    <summary><span>Настройки детектора <small>{{ local_config }}</small></span><span class="chevron" aria-hidden="true"></span></summary>
+    <div class="details-body">
+      <p class="muted">Изменения применятся со следующего сеанса. Персональная калибровка выполняется автоматически.</p>
+      {% if saved %}<p class="form-alert form-success" role="status">Настройки сохранены.</p>{% endif %}
+      {% if config_error %}<p class="form-alert" role="alert">{{ config_error }}</p>{% endif %}
+      <form method="post" action="{% url 'staff-config' %}#settings">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="config-fields">
+          {% for field in form %}
+            <div class="field">{{ field.label_tag }}{{ field }}
+              <small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>
+              {{ field.errors }}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="button button-primary">Сохранить настройки</button>
+          {% if local_config == "config.local.yaml" %}<button type="submit" formnovalidate name="reset" value="1" class="button button-secondary">Вернуть базовые</button>{% endif %}
+        </div>
+      </form>
+    </div>
+  </details>
+
+  {% if archives %}
+    <details class="panel boxed-details" id="archive" {% if archives.number > 1 %}open{% endif %}>
+      <summary><span>Архив CSV <small>{{ archives.paginator.count }}</small></span><span class="chevron" aria-hidden="true"></span></summary>
+      <ul class="archives">
+        {% for name, created in archives %}
+          <li><span>{{ created|date:"d.m.Y · H:i:s" }}</span><a class="table-link" href="{% url 'staff-archive' name %}">Скачать CSV</a></li>
+        {% endfor %}
+      </ul>
+      {% include "pagination.html" with pagination=archives param="archive" anchor="archive" %}
+    </details>
+  {% endif %}
+</main>
+{% endblock %}

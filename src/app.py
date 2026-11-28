@@ -4,15 +4,14 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import time
-from typing import Any
+from pathlib import Path
 
 import cv2
 import numpy as np
-import yaml
 
+from src.config import Config, profile_path
 from src.detector import FatigueDetector
 from src.interface import FontManager, HUDRenderer
 from src.reporting import AlertSystem, VideoLogger, plot_metrics
@@ -20,69 +19,19 @@ from src.reporting import AlertSystem, VideoLogger, plot_metrics
 logger = logging.getLogger(__name__)
 
 
-class Config:
-    # Настройки детектора: значения из YAML поверх DEFAULTS.
-    #
-    # Доступ к значениям через индексацию: ``cfg['EYE_AR_THRESH']``.
-
-    DEFAULTS: dict[str, Any] = {
-        "EYE_AR_THRESH": 0.25,
-        "EYE_CLOSED_SECONDS": 0.4,
-        "MAR_THRESH": 0.7,
-        "YAWN_SECONDS": 0.5,
-        "PERCLOS_WINDOW_SECONDS": 5.0,
-        "PERCLOS_MIN_SECONDS": 5.0,
-        "MAX_FRAME_GAP_SECONDS": 1.0,
-        "PERCLOS_THRESH": 0.4,
-        "ALERT_COOLDOWN": 5,
-        "HEAD_PITCH_THRESH": 25,
-        "HEAD_YAW_THRESH": 20,
-        "CAMERA_INDEX": 0,
-    }
-
-    def __init__(self, config_path: str = "config.yaml") -> None:
-        self.data: dict[str, Any] = self._load(config_path)
-
-    def _load(self, path: str) -> dict[str, Any]:
-        # Читает YAML; при отсутствии файла или ошибке возвращает DEFAULTS.
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    loaded = yaml.safe_load(f)
-                if loaded:
-                    # Старые конфиги переводим при допущении исходных 30 FPS.
-                    for old, new in [("EYE_AR_CONSEC_FRAMES", "EYE_CLOSED_SECONDS"),
-                                     ("YAWN_CONSEC_FRAMES", "YAWN_SECONDS"),
-                                     ("PERCLOS_WINDOW", "PERCLOS_WINDOW_SECONDS")]:
-                        if old in loaded and new not in loaded:
-                            loaded[new] = loaded[old] / 30.0
-                            logger.warning("%s устарел; используем %s при 30 FPS", old, new)
-                    if "PERCLOS_WINDOW" in loaded and "PERCLOS_MIN_SECONDS" not in loaded:
-                        loaded["PERCLOS_MIN_SECONDS"] = loaded["PERCLOS_WINDOW_SECONDS"]
-                    logger.info(f"конфиг загружен: {path}")
-                    return {**self.DEFAULTS, **loaded}
-            except Exception as e:
-                logger.warning(f"не смог прочитать {path}: {e}")
-        logger.info("используем настройки по умолчанию")
-        return dict(self.DEFAULTS)
-
-    def __getitem__(self, key: str) -> Any:
-        return self.data[key]
-
-
 class App:
     # Связывает все компоненты и крутит цикл обработки видео.
 
     def __init__(self, config_path: str = "config.yaml") -> None:
-        self.cfg = Config(config_path)
+        self.cfg = Config(profile_path(Path.cwd()) if config_path == "config.yaml" else config_path)
         self.detector = FatigueDetector(self.cfg)
         self.video_log = VideoLogger()
         self.hud = HUDRenderer(FontManager())
         self.alert = AlertSystem()
         # Эти объекты одинаковы для всех кадров — создаём их один раз.
         self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        self.landmark_style = self.detector.drawing.DrawingSpec((0, 255, 0), 1, 1)
-        self.connection_style = self.detector.drawing.DrawingSpec((0, 0, 255), 1, 1)
+        self.landmark_style = self.detector.drawing.DrawingSpec((160, 211, 187), 1, 1)
+        self.connection_style = self.detector.drawing.DrawingSpec((111, 166, 141), 1, 1)
 
         self.cap = cv2.VideoCapture(self.cfg["CAMERA_INDEX"])
         if not self.cap.isOpened():
@@ -143,16 +92,15 @@ class App:
                     self.alert.log_event(reason)
                     self.alert.play_sound()
 
-                display = self.hud.render(frame, m, self.frame_id, self.fps)
-
                 if m.detected:
                     self.detector.drawing.draw_landmarks(
-                        display, m.landmarks, self.detector.connections,
+                        frame, m.landmarks, self.detector.connections,
                         self.landmark_style,
                         self.connection_style,
                     )
 
-                cv2.imshow("детекция усталости", display)
+                display = self.hud.render(frame, m, self.frame_id, self.fps)
+                cv2.imshow("СМУ", display)
                 if cv2.waitKey(1) & 0xFF == 27:
                     break
         except KeyboardInterrupt:

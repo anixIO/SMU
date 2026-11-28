@@ -1,22 +1,18 @@
-# Настройки определения усталости: пороги, время наблюдения и выбор камеры.
-# пороги детекции глаз
-EYE_AR_THRESH: 0.22          # ниже этого значения глаз считается закрытым
-EYE_CLOSED_SECONDS: 0.4     # непрерывное закрытие глаз, секунды
+# Общий профиль СМУ. Изменения через веб-панель сохраняются в config.local.yaml.
+EYE_AR_THRESH: 0.22
+EAR_CLOSED_RATIO: 0.7
+EYE_CLOSED_SECONDS: 0.4
+MAR_THRESH: 0.3
+YAWN_SECONDS: 1.2
 
-# пороги детекции рта
-MAR_THRESH: 0.3              # выше этого значения рот считается открытым (зевки)
-YAWN_SECONDS: 0.5           # непрерывное открытие рта, секунды
+PERCLOS_WINDOW_SECONDS: 15.0
+PERCLOS_MIN_SECONDS: 8.0
+PERCLOS_THRESH: 0.4
+MAX_FRAME_GAP_SECONDS: 1.0
 
-# perclos - доля закрытых глаз в окне
-PERCLOS_WINDOW_SECONDS: 5.0 # скользящее окно, секунды
-PERCLOS_MIN_SECONDS: 5.0    # наблюдение до включения тревоги PERCLOS
-MAX_FRAME_GAP_SECONDS: 1.0  # сброс истории при паузе обработки
-PERCLOS_THRESH: 0.4          # доля выше которой считается усталостью
-
-# поза головы в градусах
-HEAD_PITCH_THRESH: 25        # наклон вперёд/назад относительно камеры
-HEAD_YAW_THRESH: 30          # поворот влево/вправо
-
-# прочее
-ALERT_COOLDOWN: 4           # пауза между оповещениями в секундах
-CAMERA_INDEX: 0              # номер камеры (0 - встроенная)
+HEAD_PITCH_THRESH: 25
+HEAD_YAW_THRESH: 30
+HEAD_AWAY_SECONDS: 0.8
+CALIBRATION_SECONDS: 3.0
+ALERT_COOLDOWN: 4
+CAMERA_INDEX: 0

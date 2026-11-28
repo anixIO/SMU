@@ -16,3 +16,8 @@ fatigue_charts/
 
 # macOS metadata
 .DS_Store
+
+# Local profile, test data and secrets
+/config.local.yaml
+/.env
+/data/
